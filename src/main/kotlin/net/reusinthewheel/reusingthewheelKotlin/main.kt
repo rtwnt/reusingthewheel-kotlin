@@ -10,14 +10,6 @@ import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.data.MutableDataSet
 import java.io.File
 
-
-class App {
-    val greeting: String
-        get() {
-            return "Hello world."
-        }
-}
-
 fun main(args: Array<String>) {
     val options = getMarkdownOptions()
     val parser = Parser.builder(options).build()
