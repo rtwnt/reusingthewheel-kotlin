@@ -19,9 +19,8 @@ class App {
 }
 
 fun main(args: Array<String>) {
-    val options = MutableDataSet()
-    options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()));
-    val parser: Parser = Parser.builder(options).build()
+    val options = getMarkdownOptions()
+    val parser = Parser.builder(options).build()
     val renderer = HtmlRenderer.builder(options).build()
 
     val document = parser.parse(File("content/posts/a-new-blog-engine-project.md").readText(Charsets.UTF_8))
@@ -31,4 +30,10 @@ fun main(args: Array<String>) {
     val html = renderer.render(document)
 
     println(html)
+}
+
+fun getMarkdownOptions(): MutableDataSet {
+    val options = MutableDataSet()
+    options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()));
+    return options
 }
