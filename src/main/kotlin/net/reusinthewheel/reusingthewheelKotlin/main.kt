@@ -7,25 +7,75 @@ import com.vladsch.flexmark.ext.yaml.front.matter.AbstractYamlFrontMatterVisitor
 import com.vladsch.flexmark.ext.yaml.front.matter.YamlFrontMatterExtension
 import com.vladsch.flexmark.html.HtmlRenderer
 import com.vladsch.flexmark.parser.Parser
+import com.vladsch.flexmark.util.ast.Node
 import com.vladsch.flexmark.util.data.MutableDataSet
 import java.io.File
+import java.nio.file.Path
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import kotlin.io.path.createDirectories
 
-fun main(args: Array<String>) {
-    val options = getMarkdownOptions()
-    val parser = Parser.builder(options).build()
-    val renderer = HtmlRenderer.builder(options).build()
+fun main() {
+    val parser = ContentParser()
 
-    val document = parser.parse(File("content/posts/a-new-blog-engine-project.md").readText(Charsets.UTF_8))
-    val visitor = AbstractYamlFrontMatterVisitor()
-    visitor.visit(document)
-    println(visitor.data)
-    val html = renderer.render(document)
+    val allContent = File("content").walkBottomUp()
+        .filter { it.path.endsWith(".md") }
+        .map {
+            parser.parseContent(it)
+        }.toList()
 
-    println(html)
+    println("DONE!")
 }
 
-fun getMarkdownOptions(): MutableDataSet {
-    val options = MutableDataSet()
-    options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()));
-    return options
+data class PageConfig(
+    val title: String,
+    val path: String,
+    val date: LocalDateTime?,
+    val categories: Set<String>,
+    val projects: Set<String>
+)
+
+class ContentParser() {
+    private val options = getMarkdownOptions()
+    private val parser = Parser.builder(options).build()
+    private val renderer = HtmlRenderer.builder(options).build()
+    private val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
+
+    private fun getMarkdownOptions(): MutableDataSet {
+        val options = MutableDataSet()
+        options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()));
+        return options
+    }
+
+    fun parseContent(file: File): PageConfig {
+        val document = parser.parse(file.readText(Charsets.UTF_8))
+        frontMatterVisitor.visit(document)
+
+        val pageConfig = PageConfig(
+            frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title"),
+            frontMatterVisitor.data["path"]?.get(0) ?: file.path.removePrefix("content").removeSuffix(".md"),
+            getDate(frontMatterVisitor.data["date"]?.get(0)),
+            frontMatterVisitor.data["categories"]?.toSet() ?: setOf(),
+            frontMatterVisitor.data["projects"]?.toSet() ?: setOf()
+        )
+
+        saveContentToFile(document, pageConfig.path)
+
+        return pageConfig
+    }
+
+    private fun getDate(value: String?): LocalDateTime? {
+        if (value != null) {
+            val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+            return LocalDateTime.parse(value, pattern)
+        }
+        return null
+    }
+
+    private fun saveContentToFile(document: Node, path: String) {
+        val html = renderer.render(document)
+        val fullPath = Path.of("public", path, "index.html")
+        fullPath.parent.createDirectories()
+        File(fullPath.toUri()).writeText(html)
+    }
 }
