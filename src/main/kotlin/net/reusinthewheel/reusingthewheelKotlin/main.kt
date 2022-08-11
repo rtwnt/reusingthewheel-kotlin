@@ -10,30 +10,129 @@ import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.ast.Node
 import com.vladsch.flexmark.util.data.MutableDataSet
 import java.io.File
+import java.net.URL
 import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
+import kotlin.Comparator
+import kotlin.io.path.Path
 import kotlin.io.path.createDirectories
 
 fun main() {
     val parser = ContentParser()
 
+    val website = Website(
+        "Reusing the wheel",
+        URL("https://reusingthewheel.net"),
+        "A blog about programming and my other hobbies",
+        "Piotr Rusin",
+        listOf()
+    )
+
     val allContent = File("content").walkBottomUp()
         .filter { it.path.endsWith(".md") }
         .map {
-            parser.parseContent(it)
+            parser.parseContent(it, website)
         }.toList()
 
     println("DONE!")
 }
 
-data class PageConfig(
+data class Link(val url: URL, val title: String)
+
+class Website(
     val title: String,
-    val path: String,
+    val baseUrl: URL,
+    val description: String,
+    val author: String,
+    val menuItems: List<String>,
+    ) {
+
+    private val pages = mutableMapOf<String, PageConfig>()
+
+    fun addPage(page: PageConfig) {
+        if (pages.containsKey(page.title)) {
+            error("Can add page ${page.title} (path: ${page.path}) - " +
+                    "page ${page.title} (path: ${pages[page.title]!!.path} already exists")
+        }
+        pages[page.title] = page
+    }
+
+    fun getPagesGroupedByYearAndSortedByDate(filter: (page: PageConfig) -> Boolean): SortedMap<Int?, List<PageConfig>> {
+        return pages.values.filter(filter)
+            .sortedByDescending { it.date }
+            .groupBy { it.date?.year }
+            .toSortedMap(Comparator.naturalOrder<Int>().reversed())
+    }
+
+    fun getPosts(): SortedMap<Int?, List<PageConfig>> {
+        return getPagesGroupedByYearAndSortedByDate { it.path.startsWith("/posts") }
+    }
+
+    fun getPagesByCategory(categoryName: String): SortedMap<Int?, List<PageConfig>> {
+        return getPagesGroupedByYearAndSortedByDate { it.categories.contains(categoryName) }
+    }
+
+    fun getPagesByProject(projectName: String): SortedMap<Int?, List<PageConfig>> {
+        return getPagesGroupedByYearAndSortedByDate { it.projects.contains(projectName) }
+    }
+
+    fun getCategoryLink(categoryName: String): Link {
+        return Link(
+            baseUrl.extendWithPath(Path.of("categories/$categoryName")),
+            categoryName
+        )
+    }
+
+    fun getProjectLink(projectName: String): Link {
+        return Link(
+            baseUrl.extendWithPath(Path.of("projects/$projectName")),
+            projectName
+        )
+    }
+
+}
+
+fun URL.extendWithPath(path: Path): URL {
+    return URL(this.protocol, this.host, this.port, Path.of("/", this.path, path.toString()).toString())
+}
+
+
+class PageConfig(
+    val title: String,
+    val path: Path,
     val date: LocalDateTime?,
     val categories: Set<String>,
-    val projects: Set<String>
-)
+    val projects: Set<String>,
+    val website: Website
+) {
+    init {
+        website.addPage(this)
+    }
+    fun geUrl(): URL {
+        return URL(
+            website.baseUrl.protocol,
+            website.baseUrl.host,
+            website.baseUrl.port,
+            Path.of(website.baseUrl.path, path.toString()).toString()
+        )
+    }
+
+    fun getCategoryLinks(): List<Link> {
+        return categories.map { website.getCategoryLink(it) }
+            .sortedBy { it.title }
+    }
+
+    fun getProjectLinks(): List<Link> {
+        return projects.map { website.getCategoryLink(it) }
+            .sortedBy { it.title }
+    }
+
+    fun getIsoDate(): String? {
+        return date?.format(DateTimeFormatter.ISO_DATE_TIME)
+    }
+}
 
 class ContentParser() {
     private val options = getMarkdownOptions()
@@ -47,16 +146,20 @@ class ContentParser() {
         return options
     }
 
-    fun parseContent(file: File): PageConfig {
+    fun parseContent(file: File, website: Website): PageConfig {
         val document = parser.parse(file.readText(Charsets.UTF_8))
         frontMatterVisitor.visit(document)
 
         val pageConfig = PageConfig(
             frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title"),
-            frontMatterVisitor.data["path"]?.get(0) ?: file.path.removePrefix("content").removeSuffix(".md"),
+            Path.of(
+                frontMatterVisitor.data["path"]?.get(0) ?:
+                file.path.removePrefix("content").removeSuffix(".md")
+            ),
             getDate(frontMatterVisitor.data["date"]?.get(0)),
             frontMatterVisitor.data["categories"]?.toSet() ?: setOf(),
-            frontMatterVisitor.data["projects"]?.toSet() ?: setOf()
+            frontMatterVisitor.data["projects"]?.toSet() ?: setOf(),
+            website
         )
 
         saveContentToFile(document, pageConfig.path)
@@ -72,9 +175,9 @@ class ContentParser() {
         return null
     }
 
-    private fun saveContentToFile(document: Node, path: String) {
+    private fun saveContentToFile(document: Node, path: Path) {
         val html = renderer.render(document)
-        val fullPath = Path.of("public", path, "index.html")
+        val fullPath = Path("public").resolve("./$path/index.html")
         fullPath.parent.createDirectories()
         File(fullPath.toUri()).writeText(html)
     }
