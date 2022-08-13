@@ -152,10 +152,7 @@ class ContentParser() {
 
         val pageConfig = PageConfig(
             frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title"),
-            Path.of(
-                frontMatterVisitor.data["path"]?.get(0) ?:
-                file.path.removePrefix("content").removeSuffix(".md")
-            ),
+            Path.of(file.path.removePrefix("content").removeSuffix(".md")),
             getDate(frontMatterVisitor.data["date"]?.get(0)),
             frontMatterVisitor.data["categories"]?.toSet() ?: setOf(),
             frontMatterVisitor.data["projects"]?.toSet() ?: setOf(),
