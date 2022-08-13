@@ -71,11 +71,11 @@ class Website(
     }
 
     fun getPagesByCategory(categoryName: String): SortedMap<Int?, List<PageConfig>> {
-        return getPagesGroupedByYearAndSortedByDate { it.categories.contains(categoryName) }
+        return getPagesGroupedByYearAndSortedByDate { it.taxonomies.categories.contains(categoryName) }
     }
 
     fun getPagesByProject(projectName: String): SortedMap<Int?, List<PageConfig>> {
-        return getPagesGroupedByYearAndSortedByDate { it.projects.contains(projectName) }
+        return getPagesGroupedByYearAndSortedByDate { it.taxonomies.projects.contains(projectName) }
     }
 
     fun getCategoryLink(categoryName: String): Link {
@@ -99,12 +99,13 @@ fun URL.extendWithPath(path: Path): URL {
 }
 
 
+data class Taxonomies(val categories: Set<String>, val projects: Set<String>)
+
 class PageConfig(
     val title: String,
     val path: Path,
     val date: LocalDateTime?,
-    val categories: Set<String>,
-    val projects: Set<String>,
+    val taxonomies: Taxonomies,
     val website: Website
 ) {
     init {
@@ -120,12 +121,12 @@ class PageConfig(
     }
 
     fun getCategoryLinks(): List<Link> {
-        return categories.map { website.getCategoryLink(it) }
+        return taxonomies.categories.map { website.getCategoryLink(it) }
             .sortedBy { it.title }
     }
 
     fun getProjectLinks(): List<Link> {
-        return projects.map { website.getCategoryLink(it) }
+        return taxonomies.projects.map { website.getCategoryLink(it) }
             .sortedBy { it.title }
     }
 
@@ -150,12 +151,16 @@ class ContentParser() {
         val document = parser.parse(file.readText(Charsets.UTF_8))
         frontMatterVisitor.visit(document)
 
+        val taxonomies = Taxonomies(
+            frontMatterVisitor.data["categories"]?.toSet() ?: setOf(),
+            frontMatterVisitor.data["projects"]?.toSet() ?: setOf()
+        )
+
         val pageConfig = PageConfig(
             frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title"),
             Path.of(file.path.removePrefix("content").removeSuffix(".md")),
             getDate(frontMatterVisitor.data["date"]?.get(0)),
-            frontMatterVisitor.data["categories"]?.toSet() ?: setOf(),
-            frontMatterVisitor.data["projects"]?.toSet() ?: setOf(),
+            taxonomies,
             website
         )
 

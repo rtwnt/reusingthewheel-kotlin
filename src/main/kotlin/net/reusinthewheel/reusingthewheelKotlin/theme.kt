@@ -22,8 +22,7 @@ fun main() {
         "aaa",
         Path.of("a/b/c"),
         LocalDateTime.now(),
-        setOf("tag1", "tag2"),
-        setOf(),
+        Taxonomies(setOf("tag1", "tag2"), setOf()),
         website
     )
 
