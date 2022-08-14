@@ -72,7 +72,7 @@ class Website(
 
     fun getTaxonomyLink(taxonomy: Taxonomy): Link {
         return Link(
-            baseUrl.extendWithPath(Path.of("${taxonomy.type.plural}/${taxonomy.type.name.lowercase()}")),
+            baseUrl.extendWithPath(taxonomy.getPath()),
             taxonomy.value
         )
     }
@@ -92,6 +92,10 @@ class Taxonomy(val value: String, val type: TaxonomyType) {
 
     fun addPage(pageConfig: PageConfig) {
         pages.add(pageConfig)
+    }
+
+    fun getPath(): Path {
+        return Path.of("${type.plural}/${type.name.lowercase()}")
     }
 
     override fun equals(other: Any?): Boolean {
@@ -197,3 +201,9 @@ class ContentParser() {
         File(fullPath.toUri()).writeText(html)
     }
 }
+
+
+// TODO: archive view for reusingthewheel.net/blog
+// taxonomy list views reusingthewheel.net/t.plural
+// archive for taxonomy item views reusingthewheel.net/t.plural/t.value
+// index page for reusingthewheel.net
