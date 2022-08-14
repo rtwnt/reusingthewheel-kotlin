@@ -22,7 +22,7 @@ fun main() {
         "aaa",
         Path.of("a/b/c"),
         LocalDateTime.now(),
-        Taxonomies(setOf("tag1", "tag2"), setOf()),
+        setOf(Taxonomy("tag1", TaxonomyType.CATEGORY), Taxonomy("tag2", TaxonomyType.CATEGORY)),
         website
     )
 
@@ -125,7 +125,7 @@ fun MAIN.pageArticle(pageConfig: PageConfig, content: String) = article {
         div {
             ul {
                 id = "tags"
-                pageConfig.getCategoryLinks().forEach {
+                pageConfig.getTaxonomyLinksByType(TaxonomyType.CATEGORY).forEach {
                     li {
                         a(it.url.toString()) {
                             +it.title

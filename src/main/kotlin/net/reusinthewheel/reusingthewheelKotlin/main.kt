@@ -70,46 +70,59 @@ class Website(
         return getPagesGroupedByYearAndSortedByDate { it.path.startsWith("/posts") }
     }
 
-    fun getPagesByCategory(categoryName: String): SortedMap<Int?, List<PageConfig>> {
-        return getPagesGroupedByYearAndSortedByDate { it.taxonomies.categories.contains(categoryName) }
-    }
-
-    fun getPagesByProject(projectName: String): SortedMap<Int?, List<PageConfig>> {
-        return getPagesGroupedByYearAndSortedByDate { it.taxonomies.projects.contains(projectName) }
-    }
-
-    fun getCategoryLink(categoryName: String): Link {
+    fun getTaxonomyLink(taxonomy: Taxonomy): Link {
         return Link(
-            baseUrl.extendWithPath(Path.of("categories/$categoryName")),
-            categoryName
+            baseUrl.extendWithPath(Path.of("${taxonomy.type.plural}/${taxonomy.type.name.lowercase()}")),
+            taxonomy.value
         )
     }
-
-    fun getProjectLink(projectName: String): Link {
-        return Link(
-            baseUrl.extendWithPath(Path.of("projects/$projectName")),
-            projectName
-        )
-    }
-
 }
 
 fun URL.extendWithPath(path: Path): URL {
     return URL(this.protocol, this.host, this.port, Path.of("/", this.path, path.toString()).toString())
 }
 
+enum class TaxonomyType(val plural: String) {
+    CATEGORY("categories"),
+    PROJECT("projects");
+}
 
-data class Taxonomies(val categories: Set<String>, val projects: Set<String>)
+class Taxonomy(val value: String, val type: TaxonomyType) {
+    private val pages = mutableSetOf<PageConfig>()
+
+    fun addPage(pageConfig: PageConfig) {
+        pages.add(pageConfig)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Taxonomy
+
+        if (value != other.value) return false
+        if (type != other.type) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = value.hashCode()
+        result = 31 * result + type.hashCode()
+        return result
+    }
+}
 
 class PageConfig(
     val title: String,
     val path: Path,
     val date: LocalDateTime?,
-    val taxonomies: Taxonomies,
+    val taxonomies: Set<Taxonomy>,
     val website: Website
 ) {
     init {
         website.addPage(this)
+        taxonomies.forEach { it.addPage(this) }
     }
     fun geUrl(): URL {
         return URL(
@@ -120,14 +133,8 @@ class PageConfig(
         )
     }
 
-    fun getCategoryLinks(): List<Link> {
-        return taxonomies.categories.map { website.getCategoryLink(it) }
-            .sortedBy { it.title }
-    }
-
-    fun getProjectLinks(): List<Link> {
-        return taxonomies.projects.map { website.getCategoryLink(it) }
-            .sortedBy { it.title }
+    fun getTaxonomyLinksByType(type: TaxonomyType): List<Link> {
+        return taxonomies.filter { it.type == type }.map { website.getTaxonomyLink(it) }
     }
 
     fun getIsoDate(): String? {
@@ -141,26 +148,32 @@ class ContentParser() {
     private val renderer = HtmlRenderer.builder(options).build()
     private val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
 
+    private val taxonomyCache = mutableMapOf<Pair<TaxonomyType, String>, Taxonomy>()
+
     private fun getMarkdownOptions(): MutableDataSet {
         val options = MutableDataSet()
         options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()));
         return options
     }
 
+    private fun getOrCreateTaxonomy(value: String, type: TaxonomyType): Taxonomy {
+        return taxonomyCache.getOrPut(Pair(type, value)) { Taxonomy(value, type) }
+    }
+
     fun parseContent(file: File, website: Website): PageConfig {
         val document = parser.parse(file.readText(Charsets.UTF_8))
         frontMatterVisitor.visit(document)
-
-        val taxonomies = Taxonomies(
-            frontMatterVisitor.data["categories"]?.toSet() ?: setOf(),
-            frontMatterVisitor.data["projects"]?.toSet() ?: setOf()
-        )
+        val taxonomiesForPage = TaxonomyType.values()
+            .flatMap { type ->
+                frontMatterVisitor.data[type.plural]
+                    ?.map {getOrCreateTaxonomy(it, type)} ?: setOf()
+            }.toSet()
 
         val pageConfig = PageConfig(
             frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title"),
             Path.of(file.path.removePrefix("content").removeSuffix(".md")),
             getDate(frontMatterVisitor.data["date"]?.get(0)),
-            taxonomies,
+            taxonomiesForPage,
             website
         )
 
