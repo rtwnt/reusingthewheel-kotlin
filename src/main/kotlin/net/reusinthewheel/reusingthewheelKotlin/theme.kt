@@ -22,7 +22,7 @@ fun main() {
         "aaa",
         Path.of("a/b/c"),
         LocalDateTime.now(),
-        setOf(Taxonomy("tag1", TaxonomyType.CATEGORY), Taxonomy("tag2", TaxonomyType.CATEGORY)),
+        setOf(TaxonomyTerm("tag1", TaxonomyType.CATEGORY), TaxonomyTerm("tag2", TaxonomyType.CATEGORY)),
         website
     )
 

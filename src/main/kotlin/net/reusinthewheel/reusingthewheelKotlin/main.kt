@@ -70,10 +70,10 @@ class Website(
         return getPagesGroupedByYearAndSortedByDate { it.path.startsWith("/posts") }
     }
 
-    fun getTaxonomyLink(taxonomy: Taxonomy): Link {
+    fun getTaxonomyLink(taxonomyTerm: TaxonomyTerm): Link {
         return Link(
-            baseUrl.extendWithPath(taxonomy.getPath()),
-            taxonomy.value
+            baseUrl.extendWithPath(taxonomyTerm.getPath()),
+            taxonomyTerm.value
         )
     }
 }
@@ -87,7 +87,7 @@ enum class TaxonomyType(val plural: String) {
     PROJECT("projects");
 }
 
-class Taxonomy(val value: String, val type: TaxonomyType) {
+class TaxonomyTerm(val value: String, val type: TaxonomyType) {
     private val pages = mutableSetOf<PageConfig>()
 
     fun addPage(pageConfig: PageConfig) {
@@ -102,7 +102,7 @@ class Taxonomy(val value: String, val type: TaxonomyType) {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
-        other as Taxonomy
+        other as TaxonomyTerm
 
         if (value != other.value) return false
         if (type != other.type) return false
@@ -121,12 +121,12 @@ class PageConfig(
     val title: String,
     val path: Path,
     val date: LocalDateTime?,
-    val taxonomies: Set<Taxonomy>,
+    val taxonomyTerms: Set<TaxonomyTerm>,
     val website: Website
 ) {
     init {
         website.addPage(this)
-        taxonomies.forEach { it.addPage(this) }
+        taxonomyTerms.forEach { it.addPage(this) }
     }
     fun geUrl(): URL {
         return URL(
@@ -138,7 +138,7 @@ class PageConfig(
     }
 
     fun getTaxonomyLinksByType(type: TaxonomyType): List<Link> {
-        return taxonomies.filter { it.type == type }.map { website.getTaxonomyLink(it) }
+        return taxonomyTerms.filter { it.type == type }.map { website.getTaxonomyLink(it) }
     }
 
     fun getIsoDate(): String? {
@@ -152,7 +152,7 @@ class ContentParser() {
     private val renderer = HtmlRenderer.builder(options).build()
     private val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
 
-    private val taxonomyCache = mutableMapOf<Pair<TaxonomyType, String>, Taxonomy>()
+    private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, TaxonomyTerm>()
 
     private fun getMarkdownOptions(): MutableDataSet {
         val options = MutableDataSet()
@@ -160,8 +160,8 @@ class ContentParser() {
         return options
     }
 
-    private fun getOrCreateTaxonomy(value: String, type: TaxonomyType): Taxonomy {
-        return taxonomyCache.getOrPut(Pair(type, value)) { Taxonomy(value, type) }
+    private fun getOrCreateTaxonomyTerm(value: String, type: TaxonomyType): TaxonomyTerm {
+        return taxonomyTermCache.getOrPut(Pair(type, value)) { TaxonomyTerm(value, type) }
     }
 
     fun parseContent(file: File, website: Website): PageConfig {
@@ -170,7 +170,7 @@ class ContentParser() {
         val taxonomiesForPage = TaxonomyType.values()
             .flatMap { type ->
                 frontMatterVisitor.data[type.plural]
-                    ?.map {getOrCreateTaxonomy(it, type)} ?: setOf()
+                    ?.map {getOrCreateTaxonomyTerm(it, type)} ?: setOf()
             }.toSet()
 
         val pageConfig = PageConfig(
