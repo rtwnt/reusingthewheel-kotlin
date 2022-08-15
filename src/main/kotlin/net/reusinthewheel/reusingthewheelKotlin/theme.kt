@@ -167,7 +167,7 @@ fun MAIN.archive(title: String, yearToArticles: Map<Int?, List<PageConfig>>) = r
     }
 }
 
-fun MAIN.taxonomyItemList(title: String, website: Website, terms: Set<TaxonomyTerm>) = article {
+fun MAIN.taxonomyTermList(title: String, website: Website, terms: Set<TaxonomyTerm>) = article {
         h1 {
             +title
         }
