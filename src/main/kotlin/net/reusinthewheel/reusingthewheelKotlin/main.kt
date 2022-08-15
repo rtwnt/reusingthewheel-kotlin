@@ -138,7 +138,7 @@ class PageConfig(
         website.addPage(this)
         taxonomyTerms.forEach { it.addPage(this) }
     }
-    fun geUrl(): URL {
+    fun getUrl(): URL {
         return URL(
             website.baseUrl.protocol,
             website.baseUrl.host,

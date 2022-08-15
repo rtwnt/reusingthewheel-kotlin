@@ -208,7 +208,7 @@ fun MAIN.archive(title: String, yearToArticles: Map<Int?, List<PageConfig>>) = r
                                 time {
                                     +it.getIsoDate()!!
                                 }
-                                a(it.geUrl().toString()) {
+                                a(it.getUrl().toString()) {
                                     +it.title
                                 }
                             }
