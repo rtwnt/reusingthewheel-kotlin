@@ -104,6 +104,10 @@ class TaxonomyTerm(val value: String, val type: TaxonomyType) {
         pages.add(pageConfig)
     }
 
+    fun getPages(): Set<PageConfig> {
+        return pages.toSet()
+    }
+
     fun getPath(): Path {
         return Path.of("${type.plural}/${type.name.lowercase()}")
     }
