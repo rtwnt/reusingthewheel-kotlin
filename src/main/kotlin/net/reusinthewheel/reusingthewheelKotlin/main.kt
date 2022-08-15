@@ -50,8 +50,10 @@ class Website(
     ) {
 
     private val pages = mutableMapOf<String, PageConfig>()
+    private val taxonomyTerms = mutableMapOf<TaxonomyType, MutableSet<TaxonomyTerm>>()
 
     fun addPage(page: PageConfig) {
+        page.taxonomyTerms.forEach { taxonomyTerms.getOrPut(it.type, ::mutableSetOf).add(it) }
         if (pages.containsKey(page.title)) {
             error("Can add page ${page.title} (path: ${page.path}) - " +
                     "page ${page.title} (path: ${pages[page.title]!!.path} already exists")
