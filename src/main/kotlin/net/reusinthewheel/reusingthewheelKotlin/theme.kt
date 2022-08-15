@@ -43,6 +43,12 @@ fun getHtmlDocument(website: Website, mainContent: MAIN.() -> Unit): Document {
     }
 }
 
+fun getStartPageHtmlDocument(website: Website, content: String) {
+    getHtmlDocument(website) {
+        startPageContent(website, content)
+    }
+}
+
 fun getArticleHtmlDocument(pageConfig: PageConfig, content: String) {
     getHtmlDocument(pageConfig.website) {
         pageArticle(pageConfig, content)
@@ -107,6 +113,53 @@ fun HTML.fullPageLayout(website: Website, mainContent: MAIN.() -> Unit) = run {
             mainContent(this)
         }
         pageFooter(website)
+    }
+}
+
+fun MAIN.startPageContent(website: Website, content: String) = article {
+    h1 {
+        +website.title
+    }
+
+    div {
+        website.description
+    }
+
+    h2 {
+        +"Most recent posts"
+    }
+    ul {
+        website.getPages()
+            .values
+            .filter { it.path.toString().contains("blog") }
+            .sortedBy { it.date }
+            .take(5)
+            .forEach { page ->
+                li {
+                    a(page.getUrl().toString()) {
+                        span { +page.title }
+                        time { +page.getIsoDate()!! }
+                    }
+                }
+            }
+    }
+
+    h2 {
+        +"Most frequent topics"
+    }
+    ul {
+        website.getTaxonomyTerms()
+            .flatMap { it.value }
+            .sortedBy { it.getPages().size }
+            .take(5)
+            .forEach {
+                li {
+                    a("${website.baseUrl}/${it.getPath()}"){
+                        span { +it.value }
+                        span { +"(${it.getPages().size})" }
+                    }
+                }
+            }
     }
 }
 
