@@ -55,9 +55,11 @@ fun getArticleListHtmlDocument(pageConfig: PageConfig) {
     }
 }
 
-fun getTaxonomyListHtmlDocument(pageConfig: PageConfig, taxonomyLinks: List<Link>) {
-    getHtmlDocument(pageConfig.website) {
-        taxonomyItemList("", taxonomyLinks)
+fun getTaxonomyListHtmlDocument(website: Website) {
+    getHtmlDocument(website) {
+        website.getTaxonomyTerms().entries.forEach {
+            taxonomyItemList(it.key.plural, website, it.value)
+        }
     }
 }
 
@@ -165,16 +167,16 @@ fun MAIN.archive(title: String, yearToArticles: Map<Int?, List<PageConfig>>) = r
     }
 }
 
-fun MAIN.taxonomyItemList(title: String, taxonomyLinks: List<Link>) = article {
+fun MAIN.taxonomyItemList(title: String, website: Website, terms: Set<TaxonomyTerm>) = article {
         h1 {
             +title
         }
         div {
             ul {
-                id="tags"
-                taxonomyLinks.forEach {
+                id="taxonomy-terms"
+                terms.forEach {
                     li {
-                        a(it.url.toString()) { +it.title }
+                        a("${website.baseUrl}/${it.getPath()}") { +"${it.value} (${it.getPages().size})" }
                     }
                 }
             }

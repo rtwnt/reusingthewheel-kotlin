@@ -52,6 +52,14 @@ class Website(
     private val pages = mutableMapOf<String, PageConfig>()
     private val taxonomyTerms = mutableMapOf<TaxonomyType, MutableSet<TaxonomyTerm>>()
 
+    fun getPages(): Map<String, PageConfig> {
+        return pages.toMap()
+    }
+
+    fun getTaxonomyTerms(): Map<TaxonomyType, Set<TaxonomyTerm>> {
+        return taxonomyTerms.entries.associate { it.key to it.value.toSet() }
+    }
+
     fun addPage(page: PageConfig) {
         page.taxonomyTerms.forEach { taxonomyTerms.getOrPut(it.type, ::mutableSetOf).add(it) }
         if (pages.containsKey(page.title)) {
