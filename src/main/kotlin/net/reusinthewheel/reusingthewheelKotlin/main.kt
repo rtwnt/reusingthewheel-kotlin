@@ -7,7 +7,6 @@ import com.vladsch.flexmark.ext.yaml.front.matter.AbstractYamlFrontMatterVisitor
 import com.vladsch.flexmark.ext.yaml.front.matter.YamlFrontMatterExtension
 import com.vladsch.flexmark.html.HtmlRenderer
 import com.vladsch.flexmark.parser.Parser
-import com.vladsch.flexmark.util.ast.Node
 import com.vladsch.flexmark.util.data.MutableDataSet
 import java.io.File
 import java.net.URL
@@ -16,8 +15,6 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.Comparator
-import kotlin.io.path.Path
-import kotlin.io.path.createDirectories
 
 class Section private constructor(
     val name: String,
@@ -51,7 +48,7 @@ class Section private constructor(
 }
 
 class PageConfigCollector(val dotSeparatedPath: String) {
-    private val path: MutableList<String> = dotSeparatedPath.split('.').toMutableList();
+    private val path: MutableList<String> = dotSeparatedPath.split('.').toMutableList()
     val pages = mutableListOf<PageConfig>()
 
     fun getCollectedPages(): List<PageConfig> {
@@ -78,8 +75,7 @@ class PageConfigCollector(val dotSeparatedPath: String) {
 }
 
 fun main() {
-    val parser = ContentParser()
-    val dataParser = DataParser()
+    val websiteContentParser = WebsiteContentBuilder()
 
     val website = Website(
         "Reusing the wheel",
@@ -90,20 +86,20 @@ fun main() {
     )
 
     File("content").walkTopDown()
-        .onEnter { dataParser.startSection(it) }
-        .onLeave { dataParser.finishSection(it) }
+        .onEnter { websiteContentParser.startSection(it) }
+        .onLeave { websiteContentParser.finishSection(it) }
         .forEach {
             if (!it.isDirectory) {
                 println(it.canonicalPath)
                 try {
-                    dataParser.addContent(it.name, parser.parseContent(it, website))
+                    websiteContentParser.addContent(it, website)
                 } catch (e: Exception) {
                     println("Error: ${e.message}. Skipping file ${it.path}")
                 }
             }
         }
 
-    website.addContent(dataParser.parsed)
+    website.addContent(websiteContentParser.rootSection)
 
     println("DONE!")
 }
@@ -139,7 +135,7 @@ class Website(
     }
 
     fun getPosts(path: String): SortedMap<Int?, List<PageConfig>> {
-        val collector = PageConfigCollector(path);
+        val collector = PageConfigCollector(path)
         content.depthFirstWalk { collector.collectPagesUnderPath(it) }
         return collector.getCollectedPages()
             .sortedByDescending { it.date }
@@ -203,6 +199,7 @@ class PageConfig(
     val path: Path,
     val date: LocalDateTime?,
     val taxonomyTerms: Set<TaxonomyTerm>,
+    val content: String,
     val website: Website
 ) {
     init {
@@ -226,20 +223,57 @@ class PageConfig(
     }
 }
 
-class DataParser {
+class WebsiteContentBuilder {
+    private val markdownContentParser = MarkdownContentParser()
+
     private val sectionBuilders = mutableListOf<Section.Builder>()
-    lateinit var parsed: Section
+    private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, TaxonomyTerm>()
+    lateinit var rootSection: Section
+
+    private fun getOrCreateTaxonomyTerm(value: String, type: TaxonomyType): TaxonomyTerm {
+        return taxonomyTermCache.getOrPut(Pair(type, value)) { TaxonomyTerm(value, type) }
+    }
+
+    fun toPageConfig(path: String, markdownContent: MarkdownContent, website: Website): PageConfig {
+        val taxonomiesForPage = TaxonomyType.values()
+            .flatMap { type ->
+                markdownContent.frontMatter[type.plural]
+                    ?.map {getOrCreateTaxonomyTerm(it, type)} ?: setOf()
+            }.toSet()
+
+        val title = markdownContent.frontMatter["title"]?.get(0) ?: error("Missing title")
+
+        return PageConfig(
+            title,
+            Path.of(path.removePrefix("content").removeSuffix(".md")),
+            getDate(markdownContent.frontMatter["date"]?.get(0)),
+            taxonomiesForPage,
+            markdownContent.renderedHtml,
+            website
+        )
+    }
+
+    private fun getDate(value: String?): LocalDateTime? {
+        if (value != null) {
+            val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+            return LocalDateTime.parse(value, pattern)
+        }
+        return null
+    }
+
     fun startSection(file: File): Boolean {
         val builder = Section.Builder().name(file.name)
         sectionBuilders.add(builder)
         return true
     }
 
-    fun addContent(filename: String, pageConfig: PageConfig) {
+    fun addContent(file: File, website: Website) {
         if (sectionBuilders.isEmpty()) {
-            error("Missing section for ${pageConfig.title}")
+            error("Missing section for ${file.path}")
         }
-        if (filename == "_index.md") {
+        val markdownContent = markdownContentParser.parseContent(file)
+        val pageConfig = toPageConfig(file.path, markdownContent, website)
+        if (file.name == "_index.md") {
             sectionBuilders.last().sectionConfig(pageConfig)
             return
         }
@@ -252,67 +286,35 @@ class DataParser {
         }
         val finishedSection = sectionBuilders.removeLast().build()
         if (sectionBuilders.isEmpty()) {
-            parsed = finishedSection;
+            rootSection = finishedSection
         } else {
             sectionBuilders.last().addChild(finishedSection)
         }
         return true
     }
 }
-class ContentParser() {
+
+data class MarkdownContent(val frontMatter: Map<String, List<String>>, val renderedHtml: String)
+
+class MarkdownContentParser() {
     private val options = getMarkdownOptions()
     private val parser = Parser.builder(options).build()
     private val renderer = HtmlRenderer.builder(options).build()
 
-    private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, TaxonomyTerm>()
-
     private fun getMarkdownOptions(): MutableDataSet {
         val options = MutableDataSet()
-        options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()));
+        options.set(Parser.EXTENSIONS, listOf(YamlFrontMatterExtension.create()))
         return options
     }
 
-    private fun getOrCreateTaxonomyTerm(value: String, type: TaxonomyType): TaxonomyTerm {
-        return taxonomyTermCache.getOrPut(Pair(type, value)) { TaxonomyTerm(value, type) }
-    }
-
-    fun parseContent(file: File, website: Website): PageConfig {
-        val document = parser.parse(file.readText(Charsets.UTF_8))
+    fun parseContent(file: File): MarkdownContent {
+        val markdownDocument = parser.parse(file.readText(Charsets.UTF_8))
         val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
-        frontMatterVisitor.visit(document)
-        val taxonomiesForPage = TaxonomyType.values()
-            .flatMap { type ->
-                frontMatterVisitor.data[type.plural]
-                    ?.map {getOrCreateTaxonomyTerm(it, type)} ?: setOf()
-            }.toSet()
+        frontMatterVisitor.visit(markdownDocument)
 
-        val title = frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title")
-
-        val pageConfig = PageConfig(
-            title,
-            Path.of(file.path.removePrefix("content").removeSuffix(".md")),
-            getDate(frontMatterVisitor.data["date"]?.get(0)),
-            taxonomiesForPage,
-            website
+        return MarkdownContent(
+            frontMatterVisitor.data,
+            renderer.render(markdownDocument)
         )
-
-        saveContentToFile(document, pageConfig.path)
-
-        return pageConfig
-    }
-
-    private fun getDate(value: String?): LocalDateTime? {
-        if (value != null) {
-            val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
-            return LocalDateTime.parse(value, pattern)
-        }
-        return null
-    }
-
-    private fun saveContentToFile(document: Node, path: Path) {
-        val html = renderer.render(document)
-        val fullPath = Path("public").resolve("./$path/index.html")
-        fullPath.parent.createDirectories()
-        File(fullPath.toUri()).writeText(html)
     }
 }
