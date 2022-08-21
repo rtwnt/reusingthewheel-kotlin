@@ -19,8 +19,67 @@ import kotlin.Comparator
 import kotlin.io.path.Path
 import kotlin.io.path.createDirectories
 
+class Section private constructor(
+    val name: String,
+    val sectionConfig: PageConfig?,
+    val parent: Section?,
+    val children: Set<Section>,
+    val content: Set<PageConfig>
+    ) {
+
+    fun depthFirstWalk(visit: (s: Section) -> Unit) {
+        visit(this)
+        children.forEach { it.depthFirstWalk(visit) }
+    }
+
+    data class Builder(
+        var name: String? = null,
+        var sectionConfig: PageConfig? = null,
+        var parent: Section? = null,
+        var children: MutableSet<Section> = mutableSetOf(),
+        var content: MutableSet<PageConfig> = mutableSetOf()
+    ) {
+        fun name(name: String) = apply { this.name = name }
+        fun sectionConfig(sectionConfig: PageConfig) = apply { this.sectionConfig = sectionConfig }
+        fun parent(sectionConfig: PageConfig) = apply { this.sectionConfig = sectionConfig }
+        fun addChild(child: Section) = apply { children.add(child) }
+        fun addContent(pageConfig: PageConfig) = apply { content.add(pageConfig) }
+
+        fun build() = Section(name!!, sectionConfig, parent, children, content)
+    }
+
+}
+
+class PageConfigCollector(val dotSeparatedPath: String) {
+    private val path: MutableList<String> = dotSeparatedPath.split('.').toMutableList();
+    val pages = mutableListOf<PageConfig>()
+
+    fun getCollectedPages(): List<PageConfig> {
+        return pages.toList()
+    }
+
+    fun collectPagesUnderPath(section: Section) {
+        if (path.isEmpty()) {
+            section.depthFirstWalk { collectPages(it) }
+        } else {
+            val segment = path.removeFirst()
+            if (section.children.none { it.name == segment }) {
+                error("Incorrect path")
+            }
+            val nextSection = section.children.first { it.name ==  segment}
+            nextSection.depthFirstWalk { collectPagesUnderPath(it) }
+        }
+    }
+
+    fun collectPages(section: Section) {
+        pages.addAll(section.content)
+        section.children.forEach { child -> child.depthFirstWalk { collectPages(it) } }
+    }
+}
+
 fun main() {
     val parser = ContentParser()
+    val dataParser = DataParser()
 
     val website = Website(
         "Reusing the wheel",
@@ -30,11 +89,21 @@ fun main() {
         listOf()
     )
 
-    val allContent = File("content").walkBottomUp()
-        .filter { it.path.endsWith(".md") }
-        .map {
-            parser.parseContent(it, website)
-        }.toList()
+    File("content").walkTopDown()
+        .onEnter { dataParser.startSection(it) }
+        .onLeave { dataParser.finishSection(it) }
+        .forEach {
+            if (!it.isDirectory) {
+                println(it.canonicalPath)
+                try {
+                    dataParser.addContent(it.name, parser.parseContent(it, website))
+                } catch (e: Exception) {
+                    println("Error: ${e.message}. Skipping file ${it.path}")
+                }
+            }
+        }
+
+    website.addContent(dataParser.parsed)
 
     println("DONE!")
 }
@@ -50,6 +119,7 @@ class Website(
     ) {
 
     private val pages = mutableMapOf<String, PageConfig>()
+    private lateinit var content: Section
     private val taxonomyTerms = mutableMapOf<TaxonomyType, MutableSet<TaxonomyTerm>>()
 
     fun getPages(): Map<String, PageConfig> {
@@ -60,24 +130,21 @@ class Website(
         return taxonomyTerms.entries.associate { it.key to it.value.toSet() }
     }
 
-    fun addPage(page: PageConfig) {
-        page.taxonomyTerms.forEach { taxonomyTerms.getOrPut(it.type, ::mutableSetOf).add(it) }
-        if (pages.containsKey(page.title)) {
-            error("Can add page ${page.title} (path: ${page.path}) - " +
-                    "page ${page.title} (path: ${pages[page.title]!!.path} already exists")
+    fun addContent(content: Section) {
+        this.content = content
+        content.depthFirstWalk { section ->
+            section.content.flatMap { it.taxonomyTerms }
+                .forEach { taxonomyTerms.getOrPut(it.type, ::mutableSetOf).add(it) }
         }
-        pages[page.title] = page
     }
 
-    fun getPagesGroupedByYearAndSortedByDate(filter: (page: PageConfig) -> Boolean): SortedMap<Int?, List<PageConfig>> {
-        return pages.values.filter(filter)
+    fun getPosts(path: String): SortedMap<Int?, List<PageConfig>> {
+        val collector = PageConfigCollector(path);
+        content.depthFirstWalk { collector.collectPagesUnderPath(it) }
+        return collector.getCollectedPages()
             .sortedByDescending { it.date }
             .groupBy { it.date?.year }
             .toSortedMap(Comparator.naturalOrder<Int>().reversed())
-    }
-
-    fun getPosts(): SortedMap<Int?, List<PageConfig>> {
-        return getPagesGroupedByYearAndSortedByDate { it.path.startsWith("/posts") }
     }
 
     fun getTaxonomyLink(taxonomyTerm: TaxonomyTerm): Link {
@@ -109,7 +176,7 @@ class TaxonomyTerm(val value: String, val type: TaxonomyType) {
     }
 
     fun getPath(): Path {
-        return Path.of("${type.plural}/${type.name.lowercase()}")
+        return Path.of("${type.plural}/${value.lowercase().replace(' ', '-')}")
     }
 
     override fun equals(other: Any?): Boolean {
@@ -139,7 +206,6 @@ class PageConfig(
     val website: Website
 ) {
     init {
-        website.addPage(this)
         taxonomyTerms.forEach { it.addPage(this) }
     }
     fun getUrl(): URL {
@@ -160,11 +226,43 @@ class PageConfig(
     }
 }
 
+class DataParser {
+    private val sectionBuilders = mutableListOf<Section.Builder>()
+    lateinit var parsed: Section
+    fun startSection(file: File): Boolean {
+        val builder = Section.Builder().name(file.name)
+        sectionBuilders.add(builder)
+        return true
+    }
+
+    fun addContent(filename: String, pageConfig: PageConfig) {
+        if (sectionBuilders.isEmpty()) {
+            error("Missing section for ${pageConfig.title}")
+        }
+        if (filename == "_index.md") {
+            sectionBuilders.last().sectionConfig(pageConfig)
+            return
+        }
+        sectionBuilders.last().addContent(pageConfig)
+    }
+
+    fun finishSection(file: File): Boolean {
+        if (sectionBuilders.isEmpty()) {
+            error("No section to process")
+        }
+        val finishedSection = sectionBuilders.removeLast().build()
+        if (sectionBuilders.isEmpty()) {
+            parsed = finishedSection;
+        } else {
+            sectionBuilders.last().addChild(finishedSection)
+        }
+        return true
+    }
+}
 class ContentParser() {
     private val options = getMarkdownOptions()
     private val parser = Parser.builder(options).build()
     private val renderer = HtmlRenderer.builder(options).build()
-    private val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
 
     private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, TaxonomyTerm>()
 
@@ -180,6 +278,7 @@ class ContentParser() {
 
     fun parseContent(file: File, website: Website): PageConfig {
         val document = parser.parse(file.readText(Charsets.UTF_8))
+        val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
         frontMatterVisitor.visit(document)
         val taxonomiesForPage = TaxonomyType.values()
             .flatMap { type ->
@@ -187,8 +286,10 @@ class ContentParser() {
                     ?.map {getOrCreateTaxonomyTerm(it, type)} ?: setOf()
             }.toSet()
 
+        val title = frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title")
+
         val pageConfig = PageConfig(
-            frontMatterVisitor.data["title"]?.get(0) ?: error("Missing title"),
+            title,
             Path.of(file.path.removePrefix("content").removeSuffix(".md")),
             getDate(frontMatterVisitor.data["date"]?.get(0)),
             taxonomiesForPage,
@@ -215,9 +316,3 @@ class ContentParser() {
         File(fullPath.toUri()).writeText(html)
     }
 }
-
-
-// TODO: archive view for reusingthewheel.net/blog
-// taxonomy list views reusingthewheel.net/t.plural
-// archive for taxonomy item views reusingthewheel.net/t.plural/t.value
-// index page for reusingthewheel.net

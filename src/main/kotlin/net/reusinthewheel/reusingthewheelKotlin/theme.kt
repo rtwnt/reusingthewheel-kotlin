@@ -43,26 +43,26 @@ fun getHtmlDocument(website: Website, mainContent: MAIN.() -> Unit): Document {
     }
 }
 
-fun getStartPageHtmlDocument(website: Website, content: String) {
-    getHtmlDocument(website) {
+fun getStartPageHtmlDocument(website: Website, content: String): Document {
+    return getHtmlDocument(website) {
         startPageContent(website, content)
     }
 }
 
-fun getArticleHtmlDocument(pageConfig: PageConfig, content: String) {
-    getHtmlDocument(pageConfig.website) {
+fun getArticleHtmlDocument(pageConfig: PageConfig, content: String): Document {
+    return getHtmlDocument(pageConfig.website) {
         pageArticle(pageConfig, content)
     }
 }
 
-fun getArticleListHtmlDocument(pageConfig: PageConfig) {
-    getHtmlDocument(pageConfig.website) {
-        archive("", pageConfig.website.getPosts())
+fun getArticleListHtmlDocument(pageConfig: PageConfig): Document {
+    return getHtmlDocument(pageConfig.website) {
+        archive("", pageConfig.website.getPosts("blog"))
     }
 }
 
-fun getTaxonomyListHtmlDocument(website: Website) {
-    getHtmlDocument(website) {
+fun getTaxonomyListHtmlDocument(website: Website): Document {
+    return getHtmlDocument(website) {
         website.getTaxonomyTerms().entries.forEach {
             taxonomyTermList(it.key.plural, website, it.value)
         }
