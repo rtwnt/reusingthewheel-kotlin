@@ -192,6 +192,18 @@ class TaxonomyTerm(val value: String, val type: TaxonomyType) {
         result = 31 * result + type.hashCode()
         return result
     }
+
+    companion object {
+        private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, TaxonomyTerm>()
+
+        fun getOrCreate(value: String, type: TaxonomyType): TaxonomyTerm {
+            return taxonomyTermCache.getOrPut(Pair(type, value)) { TaxonomyTerm(value, type) }
+        }
+
+        fun getAllMappedByType(): Map<TaxonomyType, List<TaxonomyTerm>> {
+            return taxonomyTermCache.values.groupBy { it.type }
+        }
+    }
 }
 
 class PageConfig(
@@ -227,18 +239,13 @@ class WebsiteContentBuilder {
     private val markdownContentParser = MarkdownContentParser()
 
     private val sectionBuilders = mutableListOf<Section.Builder>()
-    private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, TaxonomyTerm>()
     lateinit var rootSection: Section
-
-    private fun getOrCreateTaxonomyTerm(value: String, type: TaxonomyType): TaxonomyTerm {
-        return taxonomyTermCache.getOrPut(Pair(type, value)) { TaxonomyTerm(value, type) }
-    }
 
     fun toPageConfig(path: String, markdownContent: MarkdownContent, website: Website): PageConfig {
         val taxonomiesForPage = TaxonomyType.values()
             .flatMap { type ->
                 markdownContent.frontMatter[type.plural]
-                    ?.map {getOrCreateTaxonomyTerm(it, type)} ?: setOf()
+                    ?.map {TaxonomyTerm.getOrCreate(it, type)} ?: setOf()
             }.toSet()
 
         val title = markdownContent.frontMatter["title"]?.get(0) ?: error("Missing title")
