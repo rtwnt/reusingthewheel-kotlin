@@ -2,37 +2,10 @@ package net.reusinthewheel.reusingthewheelKotlin
 
 import kotlinx.html.*
 import kotlinx.html.dom.createHTMLDocument
-import kotlinx.html.dom.serialize
-import kotlinx.html.stream.appendHTML
 import net.reusinthewheel.reusingthewheelKotlin.data.Page
 import net.reusinthewheel.reusingthewheelKotlin.data.PageImpl
 import net.reusinthewheel.reusingthewheelKotlin.data.TaxonomyTermProvider
 import org.w3c.dom.Document
-import java.time.format.DateTimeFormatter
-
-fun main() {
-//    val website = Website(
-//        "a",
-//        URL("https://reusingthewheel.net"),
-//        "descriptions",
-//        "Test Author",
-//        listOf()
-//    )
-//    val config = PageConfig(
-//        "aaa",
-//        Path.of("a/b/c"),
-//        LocalDateTime.now(),
-//        setOf(TaxonomyTerm("tag1", TaxonomyType.CATEGORY), TaxonomyTerm("tag2", TaxonomyType.CATEGORY)),
-//        "",
-//        website
-//    )
-
-//    val sb = StringBuilder()
-//    val tagConsumer = sb.appendHTML()
-//
-//    val tree = customLayout(config)
-//    println(tree.serialize(true))
-}
 
 fun customLayout(page: PageImpl): Document {
     return getHtmlDocument(page) { pageArticle(page, "example content") }

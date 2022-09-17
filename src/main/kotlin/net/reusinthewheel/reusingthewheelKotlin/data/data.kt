@@ -76,9 +76,9 @@ class PageImpl: Page{
     override val childPagesByYear: Map<Int, List<Page>>
         get() = childPages.values.filter { it.date != null }.groupBy { it.date!!.year }
     private fun getChildPagesRecursive(): List<PageImpl> {
-        val result = childPages.values.toMutableList();
+        val result = childPages.values.toMutableList()
         childPages.values.forEach { result.addAll(it.getChildPagesRecursive()) }
-        return result;
+        return result
     }
 
     private val _menuItems = mutableListOf<String>()
@@ -137,7 +137,7 @@ class PageImpl: Page{
 
         other._menuItems.forEach {
             if (_menuItems.contains(it)) {
-                return;
+                return
             }
             _menuItems.add(it)
         }
@@ -301,7 +301,7 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
 
 data class MarkdownContent(val frontMatter: Map<String, List<String>>, val renderedHtml: String)
 
-class MarkdownContentParser() {
+class MarkdownContentParser {
     private val options = getMarkdownOptions()
     private val parser = Parser.builder(options).build()
     private val renderer = HtmlRenderer.builder(options).build()
