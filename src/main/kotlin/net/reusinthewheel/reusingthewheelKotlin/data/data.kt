@@ -35,7 +35,6 @@ interface Page {
 
 class PageImpl: Page{
     override var title: String = ""
-        internal set
     override var slug: String = ""
         private set
     override var url: String = ""
