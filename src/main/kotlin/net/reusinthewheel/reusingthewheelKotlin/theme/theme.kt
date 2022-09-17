@@ -1,4 +1,4 @@
-package net.reusinthewheel.reusingthewheelKotlin
+package net.reusinthewheel.reusingthewheelKotlin.theme
 
 import kotlinx.html.*
 import kotlinx.html.dom.createHTMLDocument
