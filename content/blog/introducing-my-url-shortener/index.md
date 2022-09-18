@@ -1,13 +1,3 @@
----
-title: Introducing my URL shortener
-date: 2016-08-05T13:18
-categories:
-  - Development
-projects:
-  - url-shortener
-  - spam-lists
-
----
 URL addresses can be quite long, mainly because they often consist of path and query components, both containing a number of characters forming names of path segments and values of parameters (not necessarily meaningful to a human reader), or performing other functions. For that reason, they may be hard to type and memorize, or simply aesthetically unpleasing.
 
 Because of that, URL shorteners were created. There are plenty of them already, so there is probably no reason to create yet another such application, perhaps with one exception: it seems like an interesting idea for a small programming project that could be later extended with other features. This is why I decided to create [my own URL shortener][1].

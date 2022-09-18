@@ -1,12 +1,3 @@
----
-title: Implementing service layer for Yule
-date: 2017-06-05T09:17
-categories:
-  - Development
-projects:
-  - Yule
-
----
 Since my [introductory post on Yule][1], I&#8217;ve been doing some work on the project. I&#8217;ve implemented an automatic article publication feature as a part of service layer and I added some methods used by it to the repository layer of my project.
 
 This post covers these changes and some problems I encountered during testing.

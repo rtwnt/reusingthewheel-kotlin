@@ -1,12 +1,3 @@
----
-title: Designing a plugin system for base16-theme-switcher
-date: 2017-11-02T09:22
-categories:
-  - Development
-projects:
-  - base16-theme-switcher
-
----
 I&#8217;ve been working on a plugin system for my [theme switcher project][1], and I think now it&#8217;s the time to introduce it here and describe my rationale behind its design.
 
 <!--more-->

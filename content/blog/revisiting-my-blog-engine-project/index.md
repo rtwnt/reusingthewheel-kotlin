@@ -1,12 +1,3 @@
----
-title: "Revisiting my blog engine project"
-date: 2017-12-04T14:38
-categories:
-  - Development
-projects:
-  - Yule
-
----
 I recently went back to developing [Yule][1] - my blog engine project based, among others, on [the Spring Boot framework][2]. I made some progress in both its front end and back end, and I would like to sum it up in this note
 
 <!--more-->

@@ -1,12 +1,3 @@
----
-title: The first stable release of spam-lists
-date: 2016-11-30T10:44
-categories:
-  - Development
-projects:
-  - spam-lists
-
----
 I released the first stable version of spam-lists. It can be downloaded from [github][1] or [PyPI][2].
 
 In comparison to the version described in [this post][3], the stable version contains some changes, mostly spelling error corrections and reformatting of docstrings. I have also changed the license of the project from [Apache License 2.0][4] to [MIT][5].

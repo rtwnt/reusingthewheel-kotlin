@@ -38,7 +38,7 @@ fun getArticleListHtmlDocument(page: Page): Document {
 fun getTaxonomyListHtmlDocument(website: PageImpl): Document {
     return getHtmlDocument(website) {
         TaxonomyTermProvider.getAllTaxonomyTerms().entries.forEach {
-            taxonomyTermList(it.key.plural, website, it.value)
+            taxonomyTermList(it.key, website, it.value)
         }
     }
 }

@@ -1,12 +1,3 @@
----
-title: 'A new project: base16-theme-switcher'
-date: 2017-10-22T14:39
-categories:
-  - Development
-projects:
-  - base16-theme-switcher
-
----
 Configurability and availability of multiple desktop environments and window managers are some of the things I like about using Linux-based operating systems. In recent months I gradually migrated from using full-fledged desktop environments like [Cinnamon][1] and [Xfce][2] to using [i3wm][3] in combination with [urxvt][4], [dunst][5] and other applications commonly used with light window managers. While experimenting with their configuration, I discovered [base16][6] and its derivative: [base16-xresources][7] &#8211; projects providing color schemes for syntax highlighting and application theming, each based on 16 colors.
 
 <!--more-->

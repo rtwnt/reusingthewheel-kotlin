@@ -1,0 +1,13 @@
+{
+  "title": "Introducing my URL shortener",
+  "date": "2016-08-05T13:18",
+  "taxonomies": {
+    "categories": [
+      "Development"
+    ],
+    "projects": [
+      "url-shortener",
+      "spam-lists"
+    ]
+  }
+}

@@ -1,13 +1,3 @@
----
-title: Changes in url-shortener
-date: 2016-12-04T16:09
-categories:
-  - Development
-projects:
-  - url-shortener
-  - spam-lists
-
----
 [When I introduced my URL shortener project][1], I already had a working version and I thought I only needed to improve its front-end to be able to release the first stable version of the application. I also had some ideas for new features to be added to it.
 
 However, the longer I looked at my code, the more room for improvements I saw. Although I ended up adding some new features, most of the changes I made since then were refactorizations, changes in design and architecture of the application and code style improvements.

@@ -1,10 +1,11 @@
 package net.reusinthewheel.reusingthewheelKotlin.data
 
-import com.vladsch.flexmark.ext.yaml.front.matter.AbstractYamlFrontMatterVisitor
 import com.vladsch.flexmark.ext.yaml.front.matter.YamlFrontMatterExtension
 import com.vladsch.flexmark.html.HtmlRenderer
 import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.data.MutableDataSet
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.text.Normalizer
 import java.time.LocalDateTime
@@ -42,7 +43,6 @@ class PageImpl: Page{
     override var date: LocalDateTime? = null
         private set
     override var content: String = ""
-        private set
     override var description: String = ""
         private set
     override var author: String = ""
@@ -169,26 +169,21 @@ class PageImpl: Page{
         }
     }
 
-    companion object {
-        fun from(markdownContent: MarkdownContent, taxonomyTermTypes: Set<TaxonomyType>): PageImpl {
-            val result = PageImpl()
-            result.title = markdownContent.frontMatter["TITLE"]?.lastOrNull() ?: error("Missing title")
-            result.slug = markdownContent.frontMatter["SLUG"]?.lastOrNull() ?: result.title.slugify()
-            result.url = markdownContent.frontMatter["URL"]?.lastOrNull() ?: ""
-            result.date = getDate(markdownContent.frontMatter["DATE"]?.lastOrNull())
-            result.content = markdownContent.renderedHtml
-            result.description = markdownContent.frontMatter["DESCRIPTION"]?.lastOrNull() ?: ""
-            result.author = markdownContent.frontMatter["AUTHOR"]?.lastOrNull() ?: ""
+    fun mapFromFrontMatter(frontMatter: FrontMatter) {
+        title = frontMatter.title ?: error("Missing title")
+        slug = frontMatter.slug ?: title.slugify()
+        url = frontMatter.url ?: ""
+        date = getDate(frontMatter.date)
+        description = frontMatter.description ?: ""
+        author = frontMatter.author ?: ""
+        _menuItems.addAll(frontMatter.menuItems)
 
-            TaxonomyTermProvider.getOrCreateForAll(markdownContent, taxonomyTermTypes).forEach {
-                result.addTaxonomyTermPage(it)
-            }
-
-            // ignoring child pages - they will be added during public directory walk
-
-            return result
+        TaxonomyTermProvider.getOrCreateForAll(frontMatter).forEach {
+            addTaxonomyTermPage(it)
         }
+    }
 
+    companion object {
         private fun getDate(value: String?): LocalDateTime? {
             if (value != null) {
                 val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
@@ -201,39 +196,40 @@ class PageImpl: Page{
 
 data class TaxonomyType(val singular: String, val plural: String)
 
-object TaxonomyTermProvider {
-    private val taxonomyTermCache = mutableMapOf<Pair<TaxonomyType, String>, PageImpl>()
+data class TaxonomyTypeAndValue(val type: String, val value: String)
 
-    fun getOrCreate(value: String, type: TaxonomyType): PageImpl {
-        return taxonomyTermCache.getOrPut(Pair(type, value)) {
+object TaxonomyTermProvider {
+    private val taxonomyTermCache = mutableMapOf<TaxonomyTypeAndValue, PageImpl>()
+
+    fun getOrCreate(value: String, type: String): PageImpl {
+        return taxonomyTermCache.getOrPut(TaxonomyTypeAndValue(type, value)) {
             val result = PageImpl()
             result.title = value
             result
         }
     }
 
-    fun getOrCreateForAll(markdownContent: MarkdownContent, taxonomyTermTypes: Set<TaxonomyType>): List<PageImpl> {
-        return taxonomyTermTypes.flatMap { type ->
-            val values = markdownContent.frontMatter[type.plural] ?: return listOf()
-            values.map { value ->
-                getOrCreate(value, type)
+    fun getOrCreateForAll(frontMatter: FrontMatter): List<PageImpl> {
+        return frontMatter.taxonomies.flatMap { entry ->
+            entry.value.map { value ->
+                getOrCreate(value, entry.key)
             }
         }
     }
 
-    fun getAllTypes(): Set<TaxonomyType> {
+    fun getAllTypes(): Set<String> {
         return taxonomyTermCache.keys
-            .map { it.first }
+            .map { it.type }
             .distinct()
             .toSet()
     }
 
-    fun getAllTaxonomyTerms(): Map<TaxonomyType, List<Page>> {
+    fun getAllTaxonomyTerms(): Map<String, List<Page>> {
         return taxonomyTermCache.entries
-            .map { it.key.first to it.value as Page}
+            .map { it.key.type to it.value as Page}
             .groupBy { it.first }
             .entries
-            .associate { it.key to it.value.map { it.second } }
+            .associate { entry -> entry.key to entry.value.map { it.second } }
     }
 }
 
@@ -243,7 +239,7 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
     private val pages = mutableListOf<PageImpl>()
     lateinit var rootSection: PageImpl
 
-    fun startSection(file: File): Boolean {
+    private fun startDirectory(file: File): Boolean {
         // executed for directories and files
         val page = PageImpl()
         page.title = file.name
@@ -251,24 +247,19 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
         return true
     }
 
-    fun addContent(file: File) {
-        // executed for directories and files
+    private fun addContentOrMetadata(file: File) {
         if (pages.isEmpty()) {
             error("Missing page for ${file.path}")
         }
-        val markdownContent = markdownContentParser.parseContent(file)
-        val page = PageImpl.from(markdownContent, taxonomyTypes)
-        // at this point, last() is always representing an index page of a section, a list page
-        if (file.name == "_index.md") {
-            // merge with .last() - which will always represent directory
-            pages.last().merge(page)
-        } else {
-            // add as a child of last
-            pages.last().addChildPage(page)
+        if (file.extension == "md") {
+            pages.last().content = markdownContentParser.parseContent(file)
+        } else if (file.extension == "json") {
+            val frontMatter = Json.decodeFromString(FrontMatter.serializer(), file.readText(Charsets.UTF_8))
+            pages.last().mapFromFrontMatter(frontMatter)
         }
     }
 
-    fun finishSection(file: File): Boolean {
+    private fun finishDirectory(file: File): Boolean {
         if (pages.isEmpty()) {
             error("No section to process")
         }
@@ -283,13 +274,13 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
 
     fun parseAllContent() {
         File("content").walkTopDown()
-            .onEnter { startSection(it) }
-            .onLeave { finishSection(it) }
+            .onEnter { startDirectory(it) }
+            .onLeave { finishDirectory(it) }
             .forEach {
                 if (!it.isDirectory) {
                     println(it.canonicalPath)
                     try {
-                        addContent(it)
+                        addContentOrMetadata(it)
                     } catch (e: Exception) {
                         println("Error: ${e.message}. Skipping file ${it.path}")
                     }
@@ -297,8 +288,18 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
             }
     }
 }
-
-data class MarkdownContent(val frontMatter: Map<String, List<String>>, val renderedHtml: String)
+@Serializable
+data class FrontMatter(
+    val title: String?,
+    val slug: String?,
+    val url: String?,
+    val date: String?,
+    val content: String?,
+    val description: String?,
+    val author: String?,
+    val menuItems: List<String>,
+    val taxonomies: Map<String, List<String>>// Dynamic taxonomies - will not require recompiling of the project
+)
 
 class MarkdownContentParser {
     private val options = getMarkdownOptions()
@@ -311,14 +312,10 @@ class MarkdownContentParser {
         return options
     }
 
-    fun parseContent(file: File): MarkdownContent {
-        val markdownDocument = parser.parse(file.readText(Charsets.UTF_8))
-        val frontMatterVisitor = AbstractYamlFrontMatterVisitor()
-        frontMatterVisitor.visit(markdownDocument)
+    fun parseContent(file: File): String {
+        val markdownFileContent = file.readText(Charsets.UTF_8)
+        val markdownDocument = parser.parse(markdownFileContent)
 
-        return MarkdownContent(
-            frontMatterVisitor.data,
-            renderer.render(markdownDocument)
-        )
+        return renderer.render(markdownDocument)
     }
 }

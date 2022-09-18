@@ -1,12 +1,3 @@
----
-title: Progress in development of spam-lists
-date: 2016-07-09T19:19
-categories:
-  - Development
-projects:
-  - spam-lists
-
----
 Since the introduction of my spam-lists library on this blog, I made some progress in its development.
 
 I reorganized the library a bit, changed the inheritance hierarchy of exception classes, fixed some errors and published the package on PyPI. In this post, I&#8217;m going to describe the changes and explain my reasoning behind them.

@@ -1,0 +1,13 @@
+{
+  "title": "A new blog engine project",
+  "date": "2017-05-16T10:59",
+  "taxonomies": {
+    "categories": [
+      "Development"
+    ],
+    "projects": [
+      "Yule",
+      "Blog Engine"
+    ]
+  }
+}

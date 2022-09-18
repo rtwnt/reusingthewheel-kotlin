@@ -1,11 +1,3 @@
----
-title: Miskito and evolution of ligatures in my conlangs
-date: 2021-04-08T18:00
-categories:
-  - Linguistics
-  - Conlangs
----
-
 I've recently read about [Miskito language][1] of Central America, and one of its features inspired me to include similar features and their evolution in some of my conlangs.
 
 <!--more-->
