@@ -169,16 +169,16 @@ class PageImpl: Page{
         }
     }
 
-    fun mapFromFrontMatter(frontMatter: FrontMatter) {
-        title = frontMatter.title ?: error("Missing title")
-        slug = frontMatter.slug ?: title.slugify()
-        url = frontMatter.url ?: ""
-        date = getDate(frontMatter.date)
-        description = frontMatter.description ?: ""
-        author = frontMatter.author ?: ""
-        _menuItems.addAll(frontMatter.menuItems)
+    fun setValuesFromMetadata(metadata: Metadata) {
+        title = metadata.title ?: error("Missing title")
+        slug = metadata.slug ?: title.slugify()
+        url = metadata.url ?: ""
+        date = getDate(metadata.date)
+        description = metadata.description ?: ""
+        author = metadata.author ?: ""
+        _menuItems.addAll(metadata.menuItems)
 
-        TaxonomyTermProvider.getOrCreateForAll(frontMatter).forEach {
+        TaxonomyTermProvider.getOrCreateForAll(metadata).forEach {
             addTaxonomyTermPage(it)
         }
     }
@@ -209,8 +209,8 @@ object TaxonomyTermProvider {
         }
     }
 
-    fun getOrCreateForAll(frontMatter: FrontMatter): List<PageImpl> {
-        return frontMatter.taxonomies.flatMap { entry ->
+    fun getOrCreateForAll(metadata: Metadata): List<PageImpl> {
+        return metadata.taxonomies.flatMap { entry ->
             entry.value.map { value ->
                 getOrCreate(value, entry.key)
             }
@@ -254,8 +254,8 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
         if (file.extension == "md") {
             pages.last().content = markdownContentParser.parseContent(file)
         } else if (file.extension == "json") {
-            val frontMatter = Json.decodeFromString(FrontMatter.serializer(), file.readText(Charsets.UTF_8))
-            pages.last().mapFromFrontMatter(frontMatter)
+            val metadata = Json.decodeFromString(Metadata.serializer(), file.readText(Charsets.UTF_8))
+            pages.last().setValuesFromMetadata(metadata)
         }
     }
 
@@ -289,7 +289,7 @@ class WebsiteContentBuilder(private val taxonomyTypes: Set<TaxonomyType>) {
     }
 }
 @Serializable
-data class FrontMatter(
+data class Metadata(
     val title: String?,
     val slug: String?,
     val url: String?,
